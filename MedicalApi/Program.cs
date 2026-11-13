@@ -8,6 +8,7 @@ builder.Services.AddControllers(options =>
 {
     options.SuppressImplicitRequiredAttributeForNonNullableReferenceTypes = true;
 });
+
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
