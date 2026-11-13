@@ -1,17 +1,19 @@
 ﻿using System.ComponentModel.DataAnnotations;
+using System.Text.Json.Serialization;
 
 namespace MedicalApi.Models;
 
 public class Patient
 {
-    public int Id { get; set; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] 
+
+    public int? Id { get; set; }
 
     [Required(ErrorMessage = "Имя пациента обязательно")]
     public string Name { get; set; } = "";
 
     [Required(ErrorMessage = "Дата рождения обязательна")]
-    public DateTime BirthDate { get; set; }
-
+    public DateOnly BirthDate { get; set; }
     [Required(ErrorMessage = "Номер телефона обязателен")]
     [Phone(ErrorMessage = "Некорректный номер телефона")]
     public string Phone { get; set; } = "";
