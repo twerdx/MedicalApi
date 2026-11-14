@@ -12,20 +12,28 @@ public class MedicalDbContext : DbContext
     public DbSet<Patient> Patients { get; set; }
     public DbSet<Spravka> Spravki { get; set; }
     public DbSet<SpravkaType> SpravkaTypes { get; set; }
-    // сюда же таблица вашего модуля
+    public DbSet<Appointment> Appointments { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        // у справки один пациент, у пациента много справок, связь через PatientId
+        // Restrict: нельзя удалить пациента / вид справки, пока на них ссылаются справки
+
         modelBuilder.Entity<Spravka>()
             .HasOne<Patient>()
             .WithMany()
-            .HasForeignKey(s => s.PatientId);
+            .HasForeignKey(s => s.PatientId)
+            .OnDelete(DeleteBehavior.Restrict);
 
-        // у справки один вид, у вида много справок, связь через SpravkaTypeId
         modelBuilder.Entity<Spravka>()
             .HasOne<SpravkaType>()
             .WithMany()
-            .HasForeignKey(s => s.SpravkaTypeId);
+            .HasForeignKey(s => s.SpravkaTypeId)
+            .OnDelete(DeleteBehavior.Restrict);
+
+        modelBuilder.Entity<Appointment>()
+            .HasOne<Patient>()
+            .WithMany()
+            .HasForeignKey(a => a.PatientId)
+            .OnDelete(DeleteBehavior.Restrict);
     }
 }

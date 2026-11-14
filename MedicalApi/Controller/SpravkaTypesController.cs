@@ -1,28 +1,29 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using MedicalApi.Data;
 using MedicalApi.Models;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 [ApiController]
 [Route("api/[controller]")]
 public class SpravkaTypesController : ControllerBase
 {
-    private static List<SpravkaType> _types = new List<SpravkaType>
-    {
-        new SpravkaType { Id = 1, Name = "Справка для бассейна", Price = 500 },
-        new SpravkaType { Id = 2, Name = "Медицинская справка", Price = 700 },
-        new SpravkaType { Id = 3, Name = "Справка для университета", Price = 600 },
-        new SpravkaType { Id = 4, Name = "Справка о состоянии здоровья", Price = 800 }
-    };
+    private readonly MedicalDbContext _db;
 
-    [HttpGet]
-    public List<SpravkaType> GetAll()
+    public SpravkaTypesController(MedicalDbContext db)
     {
-        return _types;
+        _db = db;
     }
 
-    [HttpGet("{id}")]
-    public ActionResult<SpravkaType> GetById(int id)
+    [HttpGet]
+    public async Task<List<SpravkaType>> GetAll()
     {
-        SpravkaType? type = _types.FirstOrDefault(t => t.Id == id);
+        return await _db.SpravkaTypes.OrderBy(t => t.Id).ToListAsync();
+    }
+
+    [HttpGet("{id:int}")]
+    public async Task<ActionResult<SpravkaType>> GetById(int id)
+    {
+        SpravkaType? type = await _db.SpravkaTypes.FirstOrDefaultAsync(t => t.Id == id);
 
         if (type == null)
         {
@@ -33,23 +34,20 @@ public class SpravkaTypesController : ControllerBase
     }
 
     [HttpPost]
-    public ActionResult<SpravkaType> Create(SpravkaType type)
+    public async Task<ActionResult<SpravkaType>> Create(SpravkaType type)
     {
-        type.Id = _types.Count == 0
-            ? 1
-            : _types.Max(t => t.Id) + 1;        _types.Add(type);
+        type.Id = 0; // номер выдаёт база
 
-        return CreatedAtAction(
-            nameof(GetById),
-            new { id = type.Id },
-            type
-        );
+        _db.SpravkaTypes.Add(type);
+        await _db.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetById), new { id = type.Id }, type);
     }
 
-    [HttpPut("{id}")]
-    public ActionResult<SpravkaType> Update(int id, SpravkaType type)
+    [HttpPut("{id:int}")]
+    public async Task<ActionResult<SpravkaType>> Update(int id, SpravkaType type)
     {
-        SpravkaType? existingType = _types.FirstOrDefault(t => t.Id == id);
+        SpravkaType? existingType = await _db.SpravkaTypes.FirstOrDefaultAsync(t => t.Id == id);
 
         if (existingType == null)
         {
@@ -59,25 +57,32 @@ public class SpravkaTypesController : ControllerBase
         existingType.Name = type.Name;
         existingType.Price = type.Price;
 
+        await _db.SaveChangesAsync();
+
         return Ok(existingType);
     }
 
-    [HttpDelete("{id}")]
-    public ActionResult Delete(int id)
+    [HttpDelete("{id:int}")]
+    [ProducesResponseType(204)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(404)]
+    public async Task<ActionResult> Delete(int id)
     {
-        SpravkaType? type = _types.FirstOrDefault(t => t.Id == id);
+        SpravkaType? type = await _db.SpravkaTypes.FirstOrDefaultAsync(t => t.Id == id);
 
         if (type == null)
         {
             return NotFound();
         }
 
-        _types.Remove(type);
+        if (await _db.Spravki.AnyAsync(s => s.SpravkaTypeId == id))
+        {
+            return BadRequest("Нельзя удалить вид справки: по нему уже выписаны справки");
+        }
+
+        _db.SpravkaTypes.Remove(type);
+        await _db.SaveChangesAsync();
 
         return NoContent();
-    }
-    public static SpravkaType? GetTypeById(int id)
-    {
-        return _types.FirstOrDefault(t => t.Id == id);
     }
 }

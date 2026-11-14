@@ -22,6 +22,35 @@ namespace MedicalApi.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("MedicalApi.Models.Appointment", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<DateTime>("AppointmentDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("DoctorName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int>("PatientId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PatientId");
+
+                    b.ToTable("Appointments");
+                });
+
             modelBuilder.Entity("MedicalApi.Models.Patient", b =>
                 {
                     b.Property<int>("Id")
@@ -111,18 +140,27 @@ namespace MedicalApi.Migrations
                     b.ToTable("SpravkaTypes");
                 });
 
+            modelBuilder.Entity("MedicalApi.Models.Appointment", b =>
+                {
+                    b.HasOne("MedicalApi.Models.Patient", null)
+                        .WithMany()
+                        .HasForeignKey("PatientId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+                });
+
             modelBuilder.Entity("MedicalApi.Models.Spravka", b =>
                 {
                     b.HasOne("MedicalApi.Models.Patient", null)
                         .WithMany()
                         .HasForeignKey("PatientId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
 
                     b.HasOne("MedicalApi.Models.SpravkaType", null)
                         .WithMany()
                         .HasForeignKey("SpravkaTypeId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 #pragma warning restore 612, 618

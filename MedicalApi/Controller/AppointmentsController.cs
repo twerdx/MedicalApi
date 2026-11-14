@@ -1,22 +1,29 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using MedicalApi.Data;
 using MedicalApi.Models;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 [ApiController]
 [Route("api/[controller]")]
 public class AppointmentsController : ControllerBase
 {
-    private static List<Appointment> _appointments = new List<Appointment>();
+    private readonly MedicalDbContext _db;
 
-    [HttpGet]
-    public List<Appointment> GetAll()
+    public AppointmentsController(MedicalDbContext db)
     {
-        return _appointments;
+        _db = db;
     }
 
-    [HttpGet("{id}")]
-    public ActionResult<Appointment> GetById(int id)
+    [HttpGet]
+    public async Task<List<Appointment>> GetAll()
     {
-        Appointment? appointment = _appointments.FirstOrDefault(a => a.Id == id);
+        return await _db.Appointments.OrderBy(a => a.Id).ToListAsync();
+    }
+
+    [HttpGet("{id:int}")]
+    public async Task<ActionResult<Appointment>> GetById(int id)
+    {
+        Appointment? appointment = await _db.Appointments.FirstOrDefaultAsync(a => a.Id == id);
 
         if (appointment == null)
         {
@@ -26,28 +33,41 @@ public class AppointmentsController : ControllerBase
         return Ok(appointment);
     }
 
+    // AppointmentDate отправляйте в UTC с буквой Z: "2026-11-20T04:00:00Z"
     [HttpPost]
-    public ActionResult<Appointment> Create(Appointment appointment)
+    [ProducesResponseType(typeof(Appointment), 201)]
+    [ProducesResponseType(400)]
+    public async Task<ActionResult<Appointment>> Create(Appointment appointment)
     {
-        appointment.Id = _appointments.Count == 0
-            ? 1
-            : _appointments.Max(a => a.Id) + 1;        _appointments.Add(appointment);
+        if (!await _db.Patients.AnyAsync(p => p.Id == appointment.PatientId))
+        {
+            return BadRequest("Пациента с таким PatientId не существует");
+        }
 
-        return CreatedAtAction(
-            nameof(GetById),
-            new { id = appointment.Id },
-            appointment
-        );
+        appointment.Id = 0;
+
+        _db.Appointments.Add(appointment);
+        await _db.SaveChangesAsync();
+
+        return CreatedAtAction(nameof(GetById), new { id = appointment.Id }, appointment);
     }
 
-    [HttpPut("{id}")]
-    public ActionResult<Appointment> Update(int id, Appointment appointment)
+    [HttpPut("{id:int}")]
+    [ProducesResponseType(typeof(Appointment), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(404)]
+    public async Task<ActionResult<Appointment>> Update(int id, Appointment appointment)
     {
-        Appointment? existing = _appointments.FirstOrDefault(a => a.Id == id);
+        Appointment? existing = await _db.Appointments.FirstOrDefaultAsync(a => a.Id == id);
 
         if (existing == null)
         {
             return NotFound();
+        }
+
+        if (!await _db.Patients.AnyAsync(p => p.Id == appointment.PatientId))
+        {
+            return BadRequest("Пациента с таким PatientId не существует");
         }
 
         existing.PatientId = appointment.PatientId;
@@ -55,61 +75,52 @@ public class AppointmentsController : ControllerBase
         existing.AppointmentDate = appointment.AppointmentDate;
         existing.Status = appointment.Status;
 
+        await _db.SaveChangesAsync();
+
         return Ok(existing);
     }
 
-    [HttpDelete("{id}")]
-    public ActionResult Delete(int id)
+    [HttpDelete("{id:int}")]
+    public async Task<ActionResult> Delete(int id)
     {
-        Appointment? appointment = _appointments.FirstOrDefault(a => a.Id == id);
+        Appointment? appointment = await _db.Appointments.FirstOrDefaultAsync(a => a.Id == id);
 
         if (appointment == null)
         {
             return NotFound();
         }
 
-        _appointments.Remove(appointment);
+        _db.Appointments.Remove(appointment);
+        await _db.SaveChangesAsync();
 
         return NoContent();
     }
+
     [HttpGet("search")]
-    public ActionResult<List<Appointment>> Search(
-        string? doctorName,
-        string? status)
+    public async Task<ActionResult<List<Appointment>>> Search(string? doctorName, string? status)
     {
-        List<Appointment> result = _appointments;
+        IQueryable<Appointment> query = _db.Appointments;
 
         if (!string.IsNullOrEmpty(doctorName))
         {
-            result = result
-                .Where(a => a.DoctorName.Contains(
-                    doctorName,
-                    StringComparison.OrdinalIgnoreCase))
-                .ToList();
+            query = query.Where(a => EF.Functions.ILike(a.DoctorName, $"%{doctorName}%"));
         }
 
         if (!string.IsNullOrEmpty(status))
         {
-            result = result
-                .Where(a => a.Status == status)
-                .ToList();
+            query = query.Where(a => a.Status == status);
         }
 
-        return Ok(result);
+        return Ok(await query.OrderBy(a => a.Id).ToListAsync());
     }
+
     [HttpGet("statistics")]
-    public IActionResult GetStatistics()
+    public async Task<IActionResult> GetStatistics()
     {
-        int total = _appointments.Count;
-
-        int planned = _appointments.Count(
-            a => a.Status == "Запланирован");
-
-        int completed = _appointments.Count(
-            a => a.Status == "Завершён");
-
-        int cancelled = _appointments.Count(
-            a => a.Status == "Отменён");
+        int total = await _db.Appointments.CountAsync();
+        int planned = await _db.Appointments.CountAsync(a => a.Status == "Запланирован");
+        int completed = await _db.Appointments.CountAsync(a => a.Status == "Завершён");
+        int cancelled = await _db.Appointments.CountAsync(a => a.Status == "Отменён");
 
         return Ok(new
         {

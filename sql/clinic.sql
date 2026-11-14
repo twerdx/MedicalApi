@@ -20,6 +20,7 @@ CREATE TABLE spravki (
     price NUMERIC(10, 2) NOT NULL,
     issued_at DATE NOT NULL DEFAULT CURRENT_DATE
 );
+--вставляем в таблицу пациенты по заданному порядку данные
 INSERT INTO patients (name, birth_date, phone) VALUES
     ('Айбек Асанов', '1998-03-12', '0555123456'),
     ('Нургуль Токтосунова', '2003-07-25', '0700987654'),
@@ -27,12 +28,14 @@ INSERT INTO patients (name, birth_date, phone) VALUES
     ('Айпери Садыкова', '2001-01-30', '0772345678'),
     ('Тимур Ким', '2006-09-14', '0509111222');
 
+--вставляем в таблицу типы справок по заданному порядку данные
 INSERT INTO spravka_types (name, price, valid_days) VALUES
     ('Справка 083', 100, 365),
     ('Санитарная книжка', 750, 365),
     ('Справка 086', 300, 180),
     ('Справка в бассейн', 200, 90);
 
+--вставляем в таблицу справок по заданному порядку данные
 INSERT INTO spravki (patient_id, spravka_type_id, price, issued_at) VALUES
     (1, 1, 100, '2026-10-01'),
     (1, 4, 200, '2026-10-15'),
@@ -42,7 +45,7 @@ INSERT INTO spravki (patient_id, spravka_type_id, price, issued_at) VALUES
     (5, 4, 200, '2026-11-06'),
     (5, 1, 100, '2026-11-10');
 	
-	
+--выборочно выводим из справок соеденияя данные из разных таблиц в таблице пациенты
 SELECT spravki.id, patients.name AS patient, spravka_types.name AS spravka, spravki.price, spravki.issued_at
 FROM spravki
 JOIN patients ON spravki.patient_id = patients.id
@@ -52,21 +55,29 @@ ORDER BY spravki.issued_at;
 SELECT COUNT(*) AS spravki_count, SUM(price) AS total FROM spravki;
 
 
-
+--вывод по имени
 SELECT * FROM patients ORDER BY name;
+--после 2000
 SELECT * FROM patients where birth_date>= '2000-01-01' 
+--где номер не заполнен
 SELECT * FROM patients where phone is NULL;
+--с регистром 
 SELECT * FROM patients WHERE name LIKE '%ай%';
+--без регистра 
 SELECT * FROM patients WHERE name ILIKE '%ай%';
+--выбор выводимых данных из справок седеняя с другими таблицами где айди 1 по порядку 
 SELECT spravki.id, spravka_types.name AS spravka, spravki.price, spravki.issued_at
 FROM spravki
 JOIN spravka_types ON spravki.spravka_type_id = spravka_types.id
 WHERE spravki.patient_id = 1
 ORDER BY spravki.issued_at;
+--
 SELECT * FROM spravki
 WHERE issued_at >= '2026-11-01' AND issued_at < '2026-12-01'
 ORDER BY issued_at;
+--
 SELECT * FROM spravka_types ORDER BY price DESC LIMIT 1;
+--
 SELECT COUNT(*) AS spravki_count, SUM(price) AS total
 FROM spravki
 WHERE issued_at >= '2026-11-01' AND issued_at < '2026-12-01';
@@ -81,9 +92,8 @@ GROUP BY patients.id, patients.name
 ORDER BY spravki_count DESC;
 INSERT INTO spravki (patient_id, spravka_type_id, price) VALUES (999, 1, 100);
 INSERT INTO spravka_types (name, price, valid_days) VALUES ('Справка в лагерь', -500, 30);
-```sql
+
 INSERT INTO patients (birth_date) VALUES ('2000-01-01');
-```
 DELETE FROM patients WHERE id = 1;
 
 INSERT INTO spravki (patient_id, spravka_type_id, price) VALUES (3, 2, 750);

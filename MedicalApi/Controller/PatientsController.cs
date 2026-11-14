@@ -15,9 +15,16 @@ public class PatientsController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<List<Patient>> GetAll()
+    public async Task<List<Patient>> GetAll(string? name)
     {
-        return await _db.Patients.ToListAsync();
+        IQueryable<Patient> query = _db.Patients;
+
+        if (!string.IsNullOrWhiteSpace(name))
+        {
+            query = query.Where(p => EF.Functions.ILike(p.Name, $"%{name}%"));
+        }
+
+        return await query.OrderBy(p => p.Name).ToListAsync();
     }
 
     [HttpGet("{id:int}")]
@@ -34,9 +41,17 @@ public class PatientsController : ControllerBase
     }
 
     [HttpPost]
+    [ProducesResponseType(typeof(Patient), 201)]
+    [ProducesResponseType(400)]
     public async Task<ActionResult<Patient>> Create(Patient patient)
     {
-        // сюда ваши проверки данных из прошлого задания (если они у вас были)
+        if (patient.BirthDate > DateOnly.FromDateTime(DateTime.Now))
+        {
+            return BadRequest("Дата рождения не может быть в будущем");
+        }
+
+        // номер выдаёт база, id из тела запроса игнорируем
+        patient.Id = null;
 
         _db.Patients.Add(patient);
         await _db.SaveChangesAsync();
@@ -45,6 +60,9 @@ public class PatientsController : ControllerBase
     }
 
     [HttpPut("{id:int}")]
+    [ProducesResponseType(typeof(Patient), 200)]
+    [ProducesResponseType(400)]
+    [ProducesResponseType(404)]
     public async Task<ActionResult<Patient>> Update(int id, Patient patient)
     {
         Patient? existingPatient = await _db.Patients.FirstOrDefaultAsync(p => p.Id == id);
@@ -52,6 +70,11 @@ public class PatientsController : ControllerBase
         if (existingPatient == null)
         {
             return NotFound();
+        }
+
+        if (patient.BirthDate > DateOnly.FromDateTime(DateTime.Now))
+        {
+            return BadRequest("Дата рождения не может быть в будущем");
         }
 
         existingPatient.Name = patient.Name;
@@ -68,6 +91,7 @@ public class PatientsController : ControllerBase
 
     [HttpDelete("{id:int}")]
     [ProducesResponseType(204)]
+    [ProducesResponseType(400)]
     [ProducesResponseType(404)]
     public async Task<ActionResult> Delete(int id)
     {
@@ -76,6 +100,16 @@ public class PatientsController : ControllerBase
         if (patient == null)
         {
             return NotFound();
+        }
+
+        if (await _db.Spravki.AnyAsync(s => s.PatientId == id))
+        {
+            return BadRequest("Нельзя удалить пациента: у него есть выписанные справки");
+        }
+
+        if (await _db.Appointments.AnyAsync(a => a.PatientId == id))
+        {
+            return BadRequest("Нельзя удалить пациента: у него есть записи на приём");
         }
 
         _db.Patients.Remove(patient);
